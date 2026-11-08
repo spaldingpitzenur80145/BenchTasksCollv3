@@ -1,6 +1,7 @@
 name: Build finalpool
 on:
-  workflow_dispatch:
+  push:
+    branches: [finalpool]
 permissions:
   contents: write
 jobs:

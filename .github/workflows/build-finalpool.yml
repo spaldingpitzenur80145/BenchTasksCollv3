@@ -1,0 +1,45 @@
+name: Build finalpool
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch all developer branches
+        run: git fetch origin '+refs/heads/*:refs/remotes/origin/*'
+      - name: Copy implemented tasks
+        run: |
+          python3 - <<'PY'
+          import json, subprocess, pathlib, sys
+          manifest = json.loads(pathlib.Path('finalpool_manifest.json').read_text())
+          root = pathlib.Path('tasks/finalpool')
+          copied = 0
+          for item in manifest:
+              ref = 'origin/' + item['branch']
+              source = item['source'].rstrip('/')
+              target = root / item['task']
+              files = subprocess.check_output(['git','ls-tree','-r','--name-only',ref,source], text=True).splitlines()
+              if not files:
+                  sys.exit(f'No files for {source} on {ref}')
+              for f in files:
+                  rel = f[len(source)+1:]
+                  dest = target / rel
+                  dest.parent.mkdir(parents=True, exist_ok=True)
+                  data = subprocess.check_output(['git','show',f'{ref}:{f}'])
+                  dest.write_bytes(data)
+                  copied += 1
+          print(f'Copied {copied} files for {len(manifest)} tasks')
+          PY
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tasks/finalpool
+          git rm -q finalpool_manifest.json .github/workflows/build-finalpool.yml
+          git commit -m "Add implemented tasks to tasks/finalpool"
+          git push origin HEAD:finalpool
